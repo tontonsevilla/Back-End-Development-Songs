@@ -65,4 +65,48 @@ def count():
 @app.route("/song", methods=["GET"])
 def songs():
     songs = db.songs.find({})
-    return {"songs": json_util.dumps(songs)}, 200
+    return json.loads(json_util.dumps({ "songs": songs })), 200
+
+@app.route("/song/<int:id>", methods=["GET"])
+def get_song_by_id(id):
+    song = db.songs.find_one({"id": id})
+
+    if song:
+        return json.loads(json_util.dumps(song)), 200
+    
+    return {"message": f"song with id {id} not found"}, 404
+
+@app.route("/song", methods=["POST"])
+def create_song():
+    song = request.json
+
+    if not db.songs.find_one({"id": song["id"]}):
+        db.songs.insert_one(song)
+        inserted_song = db.songs.find_one({"id": song["id"]}, {"$oid": 1})
+        return json.loads(json_util.dumps({"inserted id": inserted_song})), 201
+    
+    return {"message": f"song with id {song['id']} already present"}, 302
+
+@app.route("/song/<int:id>", methods=["PUT"])
+def update_song(id):
+    song = db.songs.find_one({"id": id})
+
+    if song:
+        updated_song = db.songs.update_one({"id": id}, { "$set": request.json})
+        
+        if updated_song.modified_count > 0:
+            song = db.songs.find_one({"id": id})
+            return json.loads(json_util.dumps(song)), 201
+        else:
+            return {"message":"song found, but nothing updated"}
+
+    return {"message": "song not found"}, 404
+
+@app.route("/song/<int:id>", methods=["DELETE"])
+def delete_song(id):
+    deleted_song = db.songs.delete_one({"id": id})
+
+    if deleted_song.deleted_count > 0:
+        return "", 204
+    
+    return {"message": "song not found"}, 404
